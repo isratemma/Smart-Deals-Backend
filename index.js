@@ -1,10 +1,38 @@
 const express = require('express');
+import { UserInfo } from './node_modules/firebase-admin/lib/esm/auth/index';
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
+const admin = require('firebase-admin');
+
 const port = process.env.PORT || 3000;
+
+
+
+const serviceAccount = require('./smart-deals-2202e-firebase-adminsdk-fbsvc-e5eb33b339.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+
+try {
+  const userInfo = admin.auth().verifyIdToken('token');
+    console.log('after token verification',userInfo);
+  next();
+}
+catch {
+ return res.status(401).send({ error: 'Unauthorized' });
+}
+
+
+
+
+
+
+
 
 app.use(cors({
   origin: [
@@ -41,7 +69,7 @@ async function connectDB() {
 
 // ==================== JWT MIDDLEWARE ====================
 
-const verifyToken = (req, res, next) => {
+const verifyToken =async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).send({ error: 'Unauthorized - no token' });
