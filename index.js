@@ -1,38 +1,10 @@
 const express = require('express');
-import { UserInfo } from './node_modules/firebase-admin/lib/esm/auth/index';
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
-const admin = require('firebase-admin');
-
 const port = process.env.PORT || 3000;
-
-
-
-const serviceAccount = require('./smart-deals-2202e-firebase-adminsdk-fbsvc-e5eb33b339.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-
-try {
-  const userInfo = admin.auth().verifyIdToken('token');
-    console.log('after token verification',userInfo);
-  next();
-}
-catch {
- return res.status(401).send({ error: 'Unauthorized' });
-}
-
-
-
-
-
-
-
 
 app.use(cors({
   origin: [
@@ -68,8 +40,7 @@ async function connectDB() {
 }
 
 // ==================== JWT MIDDLEWARE ====================
-
-const verifyToken =async (req, res, next) => {
+const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).send({ error: 'Unauthorized - no token' });
@@ -96,7 +67,6 @@ app.post('/jwt', (req, res) => {
 
 // ==================== PRODUCTS ROUTES ====================
 
-// GET latest 6 products (public)
 app.get('/latest-products', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -107,7 +77,6 @@ app.get('/latest-products', async (req, res) => {
   }
 });
 
-// GET all products (public)
 app.get('/products', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -118,7 +87,6 @@ app.get('/products', async (req, res) => {
   }
 });
 
-// GET bids by product id — must be BEFORE /products/:id
 app.get('/products/:productId/bids', async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -130,7 +98,6 @@ app.get('/products/:productId/bids', async (req, res) => {
   }
 });
 
-// GET single product by id (public)
 app.get('/products/:id', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -144,7 +111,6 @@ app.get('/products/:id', async (req, res) => {
   }
 });
 
-// POST - create a new product (private)
 app.post('/products', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -157,7 +123,6 @@ app.post('/products', verifyToken, async (req, res) => {
   }
 });
 
-// PUT - full update a product (private)
 app.put('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -172,7 +137,6 @@ app.put('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
-// PATCH - partial update a product (private)
 app.patch('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -187,7 +151,6 @@ app.patch('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE - delete a product (private)
 app.delete('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -201,7 +164,6 @@ app.delete('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
-// SEED - insert sample products
 app.post('/seed', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -221,7 +183,6 @@ app.post('/seed', async (req, res) => {
 
 // ==================== BIDS ROUTES ====================
 
-// GET all bids (private)
 app.get('/bids', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -232,7 +193,6 @@ app.get('/bids', verifyToken, async (req, res) => {
   }
 });
 
-// GET bids by user email (private)
 app.get('/bids/user/:email', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -244,7 +204,6 @@ app.get('/bids/user/:email', verifyToken, async (req, res) => {
   }
 });
 
-// POST - place a new bid (private)
 app.post('/bids', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -257,7 +216,6 @@ app.post('/bids', verifyToken, async (req, res) => {
   }
 });
 
-// PATCH - update bid status (private)
 app.patch('/bids/:id', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -272,7 +230,6 @@ app.patch('/bids/:id', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE - delete a bid (private)
 app.delete('/bids/:id', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -288,7 +245,6 @@ app.delete('/bids/:id', verifyToken, async (req, res) => {
 
 // ==================== USERS ROUTES ====================
 
-// GET all users (private)
 app.get('/users', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -299,7 +255,6 @@ app.get('/users', verifyToken, async (req, res) => {
   }
 });
 
-// GET user by email — must be BEFORE /users/:id (private)
 app.get('/users/email/:email', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -312,7 +267,6 @@ app.get('/users/email/:email', verifyToken, async (req, res) => {
   }
 });
 
-// GET single user by id (private)
 app.get('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -326,7 +280,6 @@ app.get('/users/:id', verifyToken, async (req, res) => {
   }
 });
 
-// POST - create a new user (public — needed for registration)
 app.post('/users', async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -342,7 +295,6 @@ app.post('/users', async (req, res) => {
   }
 });
 
-// PUT - update a user (private)
 app.put('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -357,7 +309,6 @@ app.put('/users/:id', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE - delete a user (private)
 app.delete('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
