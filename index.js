@@ -1,12 +1,19 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:5176',
+    'http://localhost:3000',
+  ],
   credentials: true,
 }));
 app.use(express.json());
@@ -32,14 +39,36 @@ async function connectDB() {
   }
 }
 
+// ==================== JWT MIDDLEWARE ====================
+
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).send({ error: 'Unauthorized - no token' });
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).send({ error: 'Forbidden - invalid token' });
+    req.user = decoded;
+    next();
+  });
+};
+
 // ==================== ROOT ====================
 app.get('/', (req, res) => {
   res.send('Smart Server is running');
 });
 
+// Issue JWT — call after login from frontend
+app.post('/jwt', (req, res) => {
+  const user = req.body;
+  const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '7d' });
+  res.send({ token });
+});
+
 // ==================== PRODUCTS ROUTES ====================
 
-// GET latest 6 products
+// GET latest 6 products (public)
 app.get('/latest-products', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -50,7 +79,7 @@ app.get('/latest-products', async (req, res) => {
   }
 });
 
-// GET all products
+// GET all products (public)
 app.get('/products', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
@@ -73,24 +102,22 @@ app.get('/products/:productId/bids', async (req, res) => {
   }
 });
 
-// GET single product by id
+// GET single product by id (public)
 app.get('/products/:id', async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const result = await productsCollection.findOne(query);
-    if (!result) {
-      return res.status(404).send({ error: 'Product not found' });
-    }
+    if (!result) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// POST - create a new product
-app.post('/products', async (req, res) => {
+// POST - create a new product (private)
+app.post('/products', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
     const newProduct = req.body;
@@ -102,50 +129,44 @@ app.post('/products', async (req, res) => {
   }
 });
 
-// PUT - full update a product by id
-app.put('/products/:id', async (req, res) => {
+// PUT - full update a product (private)
+app.put('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const updatedProduct = { $set: req.body };
     const result = await productsCollection.updateOne(query, updatedProduct);
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ error: 'Product not found' });
-    }
+    if (result.matchedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// PATCH - partial update a product by id
-app.patch('/products/:id', async (req, res) => {
+// PATCH - partial update a product (private)
+app.patch('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const updatedFields = { $set: req.body };
     const result = await productsCollection.updateOne(query, updatedFields);
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ error: 'Product not found' });
-    }
+    if (result.matchedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// DELETE - delete a product by id
-app.delete('/products/:id', async (req, res) => {
+// DELETE - delete a product (private)
+app.delete('/products/:id', verifyToken, async (req, res) => {
   try {
     const productsCollection = client.db('UsersDB').collection('products');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const result = await productsCollection.deleteOne(query);
-    if (result.deletedCount === 0) {
-      return res.status(404).send({ error: 'Product not found' });
-    }
+    if (result.deletedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -172,8 +193,8 @@ app.post('/seed', async (req, res) => {
 
 // ==================== BIDS ROUTES ====================
 
-// GET all bids
-app.get('/bids', async (req, res) => {
+// GET all bids (private)
+app.get('/bids', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
     const result = await bidsCollection.find().toArray();
@@ -183,8 +204,8 @@ app.get('/bids', async (req, res) => {
   }
 });
 
-// GET bids by user email
-app.get('/bids/user/:email', async (req, res) => {
+// GET bids by user email (private)
+app.get('/bids/user/:email', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
     const email = req.params.email;
@@ -195,8 +216,8 @@ app.get('/bids/user/:email', async (req, res) => {
   }
 });
 
-// POST - place a new bid
-app.post('/bids', async (req, res) => {
+// POST - place a new bid (private)
+app.post('/bids', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
     const newBid = req.body;
@@ -208,33 +229,29 @@ app.post('/bids', async (req, res) => {
   }
 });
 
-// PATCH - update bid status
-app.patch('/bids/:id', async (req, res) => {
+// PATCH - update bid status (private)
+app.patch('/bids/:id', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const updatedFields = { $set: req.body };
     const result = await bidsCollection.updateOne(query, updatedFields);
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ error: 'Bid not found' });
-    }
+    if (result.matchedCount === 0) return res.status(404).send({ error: 'Bid not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// DELETE - delete a bid
-app.delete('/bids/:id', async (req, res) => {
+// DELETE - delete a bid (private)
+app.delete('/bids/:id', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const result = await bidsCollection.deleteOne(query);
-    if (result.deletedCount === 0) {
-      return res.status(404).send({ error: 'Bid not found' });
-    }
+    if (result.deletedCount === 0) return res.status(404).send({ error: 'Bid not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -243,8 +260,8 @@ app.delete('/bids/:id', async (req, res) => {
 
 // ==================== USERS ROUTES ====================
 
-// GET all users
-app.get('/users', async (req, res) => {
+// GET all users (private)
+app.get('/users', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const result = await usersCollection.find().toArray();
@@ -254,38 +271,34 @@ app.get('/users', async (req, res) => {
   }
 });
 
-// GET user by email — must be BEFORE /users/:id
-app.get('/users/email/:email', async (req, res) => {
+// GET user by email — must be BEFORE /users/:id (private)
+app.get('/users/email/:email', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const email = req.params.email;
     const result = await usersCollection.findOne({ email });
-    if (!result) {
-      return res.status(404).send({ error: 'User not found' });
-    }
+    if (!result) return res.status(404).send({ error: 'User not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// GET single user by id
-app.get('/users/:id', async (req, res) => {
+// GET single user by id (private)
+app.get('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const result = await usersCollection.findOne(query);
-    if (!result) {
-      return res.status(404).send({ error: 'User not found' });
-    }
+    if (!result) return res.status(404).send({ error: 'User not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// POST - create a new user (only if not already exists)
+// POST - create a new user (public — needed for registration)
 app.post('/users', async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
@@ -301,33 +314,29 @@ app.post('/users', async (req, res) => {
   }
 });
 
-// PUT - update a user by id
-app.put('/users/:id', async (req, res) => {
+// PUT - update a user (private)
+app.put('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const updatedUser = { $set: req.body };
     const result = await usersCollection.updateOne(query, updatedUser);
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ error: 'User not found' });
-    }
+    if (result.matchedCount === 0) return res.status(404).send({ error: 'User not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
   }
 });
 
-// DELETE - delete a user by id
-app.delete('/users/:id', async (req, res) => {
+// DELETE - delete a user (private)
+app.delete('/users/:id', verifyToken, async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const id = req.params.id;
     const query = { _id: new ObjectId(id) };
     const result = await usersCollection.deleteOne(query);
-    if (result.deletedCount === 0) {
-      return res.status(404).send({ error: 'User not found' });
-    }
+    if (result.deletedCount === 0) return res.status(404).send({ error: 'User not found' });
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
