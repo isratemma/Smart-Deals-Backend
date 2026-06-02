@@ -257,7 +257,6 @@ app.get('/users', verifyToken, async (req, res) => {
   }
 });
 
-// must be BEFORE /users/:id — public so login flow works
 app.get('/users/email/:email', async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
