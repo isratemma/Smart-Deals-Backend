@@ -54,7 +54,6 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// ==================== ROOT ====================
 app.get('/', (req, res) => {
   res.send('Smart Server is running');
 });
