@@ -183,7 +183,6 @@ app.post('/seed', async (req, res) => {
   }
 });
 
-// ==================== BIDS ROUTES ====================
 
 app.get('/bids', verifyToken, async (req, res) => {
   try {
