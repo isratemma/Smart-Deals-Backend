@@ -66,7 +66,6 @@ app.post('/jwt', (req, res) => {
   res.send({ token });
 });
 
-// ==================== PRODUCTS ROUTES ====================
 
 app.get('/latest-products', async (req, res) => {
   try {
