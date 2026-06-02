@@ -195,7 +195,6 @@ app.get('/bids', verifyToken, async (req, res) => {
   }
 });
 
-// must be BEFORE /bids/:id
 app.get('/bids/user/:email', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
