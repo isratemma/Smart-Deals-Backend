@@ -88,7 +88,6 @@ app.get('/products', async (req, res) => {
   }
 });
 
-// must be BEFORE /products/:id
 app.get('/products/:productId/bids', async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
