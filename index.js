@@ -245,7 +245,6 @@ app.delete('/bids/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ==================== USERS ROUTES ====================
 
 app.get('/users', verifyToken, async (req, res) => {
   try {
