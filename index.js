@@ -59,7 +59,6 @@ app.get('/', (req, res) => {
   res.send('Smart Server is running');
 });
 
-// Issue JWT token after login
 app.post('/jwt', (req, res) => {
   const user = req.body;
   const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '7d' });
