@@ -2,3 +2,4 @@ node_modules
 .env
 .DS_Store
 smart-deals-2202e-firebase-adminsdk-fbsvc-e5eb33b339.json
+JWT_SECRET =dc66f76d8e6d59b4a0ee43f10357cbeedb8e26b07fbbb1990e8109603ed2b3329cd67206cface789f571a7cbfdf65d01a8dd8ae3d0e30b4f807e3ca2fe2cbe4c

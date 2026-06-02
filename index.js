@@ -43,12 +43,13 @@ async function connectDB() {
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).send({ error: 'Unauthorized - no token' });
+    return res.status(401).send({ message: 'Unauthorized - no token' });
   }
   const token = authHeader.split(' ')[1];
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).send({ error: 'Forbidden - invalid token' });
     req.user = decoded;
+    req.tokenEmail = decoded.email;
     next();
   });
 };
@@ -58,7 +59,7 @@ app.get('/', (req, res) => {
   res.send('Smart Server is running');
 });
 
-// Issue JWT — call after login from frontend
+// Issue JWT token after login
 app.post('/jwt', (req, res) => {
   const user = req.body;
   const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -87,6 +88,7 @@ app.get('/products', async (req, res) => {
   }
 });
 
+// must be BEFORE /products/:id
 app.get('/products/:productId/bids', async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -193,6 +195,7 @@ app.get('/bids', verifyToken, async (req, res) => {
   }
 });
 
+// must be BEFORE /bids/:id
 app.get('/bids/user/:email', verifyToken, async (req, res) => {
   try {
     const bidsCollection = client.db('UsersDB').collection('bids');
@@ -255,7 +258,8 @@ app.get('/users', verifyToken, async (req, res) => {
   }
 });
 
-app.get('/users/email/:email', verifyToken, async (req, res) => {
+// must be BEFORE /users/:id — public so login flow works
+app.get('/users/email/:email', async (req, res) => {
   try {
     const usersCollection = client.db('UsersDB').collection('users');
     const email = req.params.email;
@@ -322,7 +326,6 @@ app.delete('/users/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Connect to DB first, then start server
 connectDB().then(() => {
   app.listen(port, () => {
     console.log(`Server is running on port: ${port}`);
