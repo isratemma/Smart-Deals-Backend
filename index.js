@@ -36,7 +36,6 @@ async function connectDB() {
     console.log('Successfully connected to MongoDB!');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
   }
 }
 
@@ -317,13 +316,6 @@ app.delete('/users/:id', verifyToken, async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
-//comment following commands
-//client.close();
-//await client.db("admin").command({ ping: 1 });
-console.log("Pinged your deployment. You successfully connected to MongoDB!");
+connectDB();
 
-connectDB().then(() => {
-  app.listen(port, () => {
-    console.log(`Server is running on port: ${port}`);
-  });
-});
+module.exports = app;
