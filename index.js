@@ -318,4 +318,11 @@ app.delete('/users/:id', verifyToken, async (req, res) => {
 });
 connectDB();
 
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`Server is running on port: ${port}`);
+  });
+}
+
 module.exports = app;
