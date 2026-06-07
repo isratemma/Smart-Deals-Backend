@@ -13,16 +13,13 @@ app.use(cors({
     'http://localhost:5175',
     'http://localhost:5176',
     'http://localhost:3000',
+    'https://smart-deals-products.vercel.app',
   ],
   credentials: true,
 }));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.l7zck31.mongodb.net/?appName=Cluster0`;
-
-// index.js
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString("utf8");
-const serviceAccount = JSON.parse(decoded);
 
 const client = new MongoClient(uri, {
   serverApi: {
