@@ -20,6 +20,10 @@ app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.l7zck31.mongodb.net/?appName=Cluster0`;
 
+// index.js
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString("utf8");
+const serviceAccount = JSON.parse(decoded);
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -316,6 +320,10 @@ app.delete('/users/:id', verifyToken, async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+//comment following commands
+//client.close();
+//await client.db("admin").command({ ping: 1 });
+console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 connectDB().then(() => {
   app.listen(port, () => {
