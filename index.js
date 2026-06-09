@@ -7,28 +7,39 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// MongoDB setup //
+// MongoDB setup
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.l7zck31.mongodb.net/?appName=Cluster0`;
 
-const client = new MongoClient(uri, {
+const clientOptions = {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   },
-});
+};
 
-let isConnected = false;
+// Cached connection for serverless
+let cachedClient = null;
 
 async function connectDB() {
-  if (isConnected) return;
-  try {
-    await client.connect();
-    isConnected = true;
-    console.log('Successfully connected to MongoDB!');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
+  if (cachedClient) {
+    try {
+      // Test if connection is still alive
+      await cachedClient.db('admin').command({ ping: 1 });
+      return cachedClient;
+    } catch {
+      cachedClient = null;
+    }
   }
+  const client = new MongoClient(uri, clientOptions);
+  await client.connect();
+  cachedClient = client;
+  console.log('Connected to MongoDB');
+  return client;
+}
+
+function getDB() {
+  return cachedClient ? cachedClient.db('UsersDB') : null;
 }
 
 // Middleware
@@ -50,8 +61,13 @@ app.use(express.json());
 
 // Ensure MongoDB connected on every request (serverless safe)
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('DB connection failed:', error);
+    res.status(500).send({ error: 'Database connection failed' });
+  }
 });
 
 const jwtSecret = process.env.JWT_SECRET || 'smartdeals_super_secret_key_2025';
@@ -84,7 +100,7 @@ app.post('/jwt', (req, res) => {
 
 app.get('/latest-products', async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products')
+    const result = await cachedClient.db('UsersDB').collection('products')
       .find().sort({ createdAt: -1 }).limit(6).toArray();
     res.send(result);
   } catch (error) {
@@ -94,7 +110,7 @@ app.get('/latest-products', async (req, res) => {
 
 app.get('/products', async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products').find().toArray();
+    const result = await cachedClient.db('UsersDB').collection('products').find().toArray();
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -103,7 +119,7 @@ app.get('/products', async (req, res) => {
 
 app.get('/products/:productId/bids', async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('bids')
+    const result = await cachedClient.db('UsersDB').collection('bids')
       .find({ productId: req.params.productId }).toArray();
     res.send(result);
   } catch (error) {
@@ -113,7 +129,7 @@ app.get('/products/:productId/bids', async (req, res) => {
 
 app.get('/products/:id', async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products')
+    const result = await cachedClient.db('UsersDB').collection('products')
       .findOne({ _id: new ObjectId(req.params.id) });
     if (!result) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
@@ -125,7 +141,7 @@ app.get('/products/:id', async (req, res) => {
 app.post('/products', verifyToken, async (req, res) => {
   try {
     const newProduct = { ...req.body, createdAt: new Date() };
-    const result = await client.db('UsersDB').collection('products').insertOne(newProduct);
+    const result = await cachedClient.db('UsersDB').collection('products').insertOne(newProduct);
     res.status(201).send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -134,7 +150,7 @@ app.post('/products', verifyToken, async (req, res) => {
 
 app.put('/products/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products')
+    const result = await cachedClient.db('UsersDB').collection('products')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: req.body });
     if (result.matchedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
@@ -145,7 +161,7 @@ app.put('/products/:id', verifyToken, async (req, res) => {
 
 app.patch('/products/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products')
+    const result = await cachedClient.db('UsersDB').collection('products')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: req.body });
     if (result.matchedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
@@ -156,7 +172,7 @@ app.patch('/products/:id', verifyToken, async (req, res) => {
 
 app.delete('/products/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('products')
+    const result = await cachedClient.db('UsersDB').collection('products')
       .deleteOne({ _id: new ObjectId(req.params.id) });
     if (result.deletedCount === 0) return res.status(404).send({ error: 'Product not found' });
     res.send(result);
@@ -169,7 +185,7 @@ app.delete('/products/:id', verifyToken, async (req, res) => {
 
 app.get('/bids', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('bids').find().toArray();
+    const result = await cachedClient.db('UsersDB').collection('bids').find().toArray();
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -178,7 +194,7 @@ app.get('/bids', verifyToken, async (req, res) => {
 
 app.get('/bids/user/:email', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('bids')
+    const result = await cachedClient.db('UsersDB').collection('bids')
       .find({ email: req.params.email }).toArray();
     res.send(result);
   } catch (error) {
@@ -189,7 +205,7 @@ app.get('/bids/user/:email', verifyToken, async (req, res) => {
 app.post('/bids', verifyToken, async (req, res) => {
   try {
     const newBid = { ...req.body, createdAt: new Date() };
-    const result = await client.db('UsersDB').collection('bids').insertOne(newBid);
+    const result = await cachedClient.db('UsersDB').collection('bids').insertOne(newBid);
     res.status(201).send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -198,7 +214,7 @@ app.post('/bids', verifyToken, async (req, res) => {
 
 app.patch('/bids/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('bids')
+    const result = await cachedClient.db('UsersDB').collection('bids')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: req.body });
     if (result.matchedCount === 0) return res.status(404).send({ error: 'Bid not found' });
     res.send(result);
@@ -209,7 +225,7 @@ app.patch('/bids/:id', verifyToken, async (req, res) => {
 
 app.delete('/bids/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('bids')
+    const result = await cachedClient.db('UsersDB').collection('bids')
       .deleteOne({ _id: new ObjectId(req.params.id) });
     if (result.deletedCount === 0) return res.status(404).send({ error: 'Bid not found' });
     res.send(result);
@@ -222,7 +238,7 @@ app.delete('/bids/:id', verifyToken, async (req, res) => {
 
 app.get('/users', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('users').find().toArray();
+    const result = await cachedClient.db('UsersDB').collection('users').find().toArray();
     res.send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -231,7 +247,7 @@ app.get('/users', verifyToken, async (req, res) => {
 
 app.get('/users/email/:email', async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('users')
+    const result = await cachedClient.db('UsersDB').collection('users')
       .findOne({ email: req.params.email });
     if (!result) return res.status(404).send({ error: 'User not found' });
     res.send(result);
@@ -242,7 +258,7 @@ app.get('/users/email/:email', async (req, res) => {
 
 app.get('/users/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('users')
+    const result = await cachedClient.db('UsersDB').collection('users')
       .findOne({ _id: new ObjectId(req.params.id) });
     if (!result) return res.status(404).send({ error: 'User not found' });
     res.send(result);
@@ -254,12 +270,12 @@ app.get('/users/:id', verifyToken, async (req, res) => {
 app.post('/users', async (req, res) => {
   try {
     const newUser = req.body;
-    const existingUser = await client.db('UsersDB').collection('users')
+    const existingUser = await cachedClient.db('UsersDB').collection('users')
       .findOne({ email: newUser.email });
     if (existingUser) {
       return res.status(200).send({ message: 'User already exists', user: existingUser });
     }
-    const result = await client.db('UsersDB').collection('users').insertOne(newUser);
+    const result = await cachedClient.db('UsersDB').collection('users').insertOne(newUser);
     res.status(201).send(result);
   } catch (error) {
     res.status(500).send({ error: error.message });
@@ -268,7 +284,7 @@ app.post('/users', async (req, res) => {
 
 app.put('/users/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('users')
+    const result = await cachedClient.db('UsersDB').collection('users')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: req.body });
     if (result.matchedCount === 0) return res.status(404).send({ error: 'User not found' });
     res.send(result);
@@ -279,7 +295,7 @@ app.put('/users/:id', verifyToken, async (req, res) => {
 
 app.delete('/users/:id', verifyToken, async (req, res) => {
   try {
-    const result = await client.db('UsersDB').collection('users')
+    const result = await cachedClient.db('UsersDB').collection('users')
       .deleteOne({ _id: new ObjectId(req.params.id) });
     if (result.deletedCount === 0) return res.status(404).send({ error: 'User not found' });
     res.send(result);
