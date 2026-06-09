@@ -23,7 +23,7 @@ let isConnected = false;
 async function connectDB() {
   if (isConnected) return;
   try {
-    //await client.connect();
+    await client.connect();
     isConnected = true;
     console.log('Successfully connected to MongoDB!');
   } catch (error) {
